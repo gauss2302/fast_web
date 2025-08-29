@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { BACKEND_URL } from "@/utils/server_provider";
 
-interface RegisterRequest {
+interface LoginRequest {
   email: string;
   password: string;
-  full_name?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body: RegisterRequest = await request.json();
+    const body: LoginRequest = await request.json();
 
-    const { email, password, full_name } = body;
+    const { email, password } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -22,33 +21,45 @@ export async function POST(request: NextRequest) {
     }
 
     const response = await axios.post(
-      `${BACKEND_URL}/api/v1/auth/web/register`,
+      `${BACKEND_URL}/api/v1/auth/web/login`,
       {
         email,
         password,
-        full_name,
+      },
+      {
+        withCredentials: true,
+        validateStatus: (status) => status < 500,
       }
     );
 
-    const user = response.data;
+    if (response.status !== 200) {
+      return NextResponse.json(
+        { message: "Invalid email or password" },
+        { status: 401 }
+      );
+    }
+
+    const data = response.data;
 
     return NextResponse.json(
       {
-        message: "User registered successfully",
+        message: "Login successful",
         user: {
-          id: user.id,
-          email: user.email,
-          full_name: user.full_name,
+          id: data.user.id,
+          email: data.user.email,
+          full_name: data.user.full_name,
         },
+        access_token: data.access_token,
+        expires_in: data.expires_in,
       },
-      { status: 201 }
+      { status: 200 }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("Login error:", error);
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status || 500;
-      const message = error.response?.data?.detail || "Registration failed";
+      const message = error.response?.data?.detail || "Login failed";
 
       return NextResponse.json({ message }, { status });
     }
